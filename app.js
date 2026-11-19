@@ -128,17 +128,18 @@
     return out;
   }
   function tblGrid(tx) {
-    var rowsXml = tx.match(/<hp:tr\b[^>]*>[\s\S]*?<\/hp:tr>/g) || [], g = [], merges = [], W = 0;
+    var rowsXml = tx.match(/<hp:tr\b[^>]*>[\s\S]*?<\/hp:tr>/g) || [], g = [], merges = [], W = 0, cells = [];
     rowsXml.forEach(function (rx, ri) {
       (rx.match(/<hp:tc\b[\s\S]*?<\/hp:tc>/g) || []).forEach(function (tc) {
         var c = +(tc.match(/colAddr="(\d+)"/) || [0, 0])[1], r = +(tc.match(/rowAddr="(\d+)"/) || [0, ri])[1], cs = +(tc.match(/colSpan="(\d+)"/) || [0, 1])[1], rs = +(tc.match(/rowSpan="(\d+)"/) || [0, 1])[1];
         var t = (tc.match(/<hp:p\b[\s\S]*?<\/hp:p>/g) || []).map(function (p) { return (p.match(/<hp:t\b[^>]*>[\s\S]*?<\/hp:t>/g) || []).map(unx).join(''); }).join('\n').trim();
         (g[r] = g[r] || [])[c] = t ? { v: t, t: 's', w: t } : null; W = Math.max(W, c + cs);
         if (cs > 1 || rs > 1) merges.push({ r: r, c: c, rs: rs, cs: cs });
+        cells.push({ r: r, c: c, rs: rs, cs: cs, t: t });
       });
     });
     for (var r = 0; r < rowsXml.length; r++) { g[r] = g[r] || []; for (var c = 0; c < W; c++) if (g[r][c] === undefined) g[r][c] = null; }
-    return { g: g, merges: merges, rowsXml: rowsXml };
+    return { g: g, merges: merges, rowsXml: rowsXml, cells: cells };
   }
   function parseHwpx(ab) {
     return JSZip.loadAsync(ab).then(function (zip) {
@@ -147,7 +148,7 @@
         var tabs = [], xmlOf = {};
         xmls.forEach(function (xml, si) {
           xmlOf[names[si]] = xml;
-          topTables(xml).forEach(function (t) { var gr = tblGrid(t.xml); tabs.push({ name: '표 ' + (tabs.length + 1), path: names[si], s: t.s, e: t.e, tx: t.xml, g: gr.g, merges: gr.merges, nested: t.nested, rows: gr.rowsXml }); });
+          topTables(xml).forEach(function (t) { var gr = tblGrid(t.xml); tabs.push({ name: '표 ' + (tabs.length + 1), path: names[si], s: t.s, e: t.e, tx: t.xml, g: gr.g, merges: gr.merges, nested: t.nested, rows: gr.rowsXml, cells: gr.cells }); });
         });
         return { zip: zip, tabs: tabs, xmlOf: xmlOf };
       });
@@ -511,16 +512,32 @@
     if (f && f !== '비고') return { sel: '__none', conf: 'ask', why: '이 바구니에 「' + f + '」 항목이 없어 비워 둡니다. 다른 항목을 넣으려면 골라 주세요.' };
     return { sel: '__none', conf: 'new', why: '' };
   }
-  function bestBasket(t) {
+  function bestBasket(labels) {
     var best = null, bs = -1;
-    baskets.forEach(function (b) { var sc = t.heads.filter(function (hd) { return matchField(b, hd).sel.charAt(0) !== '_'; }).length; if (sc > bs) { bs = sc; best = b; } });
+    baskets.forEach(function (b) { var sc = labels.filter(function (hd) { return matchField(b, hd).sel.charAt(0) !== '_'; }).length; if (sc > bs) { bs = sc; best = b; } });
     return best;
   }
+  function formMatch(b, label) { var m = matchField(b, label); return m.sel === '__seq' ? { sel: '__none', conf: 'new', why: '' } : m; }
   function mapTpl(t) {
     if (t.bad) return;
-    shape(t);
-    var b = (t.forceB && bkById(t.forceB)) || bestBasket(t); t.b = b; t.notes = []; t.limit = 0; t.map = [];
+    if (t.listOk) shape(t); else { t.heads = []; t.start = 0; t.cap = 0; t.footer = false; t.pre = 0; }
+    var named = t.heads.filter(function (h) { return !/^칸\d+$/.test(h); }).length;
+    t.autoShape = t.listOk && t.cap >= 1 && named >= t.heads.length * 0.6 ? 'list' : (t.cands.length >= 2 || t.places.length ? 'form' : 'list');
+    t.canList = t.listOk; t.canForm = t.cands.length >= 1 || t.places.length >= 1;
+    t.shape = t.forceShape || t.autoShape; if (t.shape === 'list' && !t.canList) t.shape = 'form'; if (t.shape === 'form' && !t.canForm) t.shape = 'list';
+    var labels = t.shape === 'form' ? t.cands.map(function (c) { return c.label; }).concat(t.places) : t.heads;
+    var b = (t.forceB && bkById(t.forceB)) || bestBasket(labels); t.b = b; t.notes = []; t.limit = 0; t.map = []; t.fmap = []; t.pmap = [];
     if (!b) return;
+    if (t.shape === 'form') {
+      var of = t.over[b.bid + '|f'] || {}, op = t.over[b.bid + '|p'] || {};
+      var mk = function (label, o) { if (o != null && (o.charAt(0) === '_' || b.fields.indexOf(o) >= 0)) return { sel: o, conf: 'done', why: '' }; var m = formMatch(b, label); return { sel: m.sel, conf: m.conf, why: m.why || '' }; };
+      t.fmap = t.cands.map(function (cd, i) { var m = mk(cd.label, of[i]); m.head = cd.label; return m; });
+      t.pmap = t.places.map(function (n, i) { var m = mk(n, op[i]); m.head = '{' + n + '}'; m.name = n; return m; });
+      t.limit = included(b).length;
+      if (baskets.length > 1 && !t.forceB) t.notes.push({ t: '이 그릇의 칸과 가장 잘 맞는 바구니 ' + b.no + '을(를) 골랐습니다. 다른 바구니를 담으려면 위 「담을 바구니」를 바꿔 주세요.' });
+      if (!t.fmap.concat(t.pmap).some(function (m) { return m.sel.charAt(0) !== '_'; })) t.notes.push({ warn: true, t: '이 그릇의 칸 가운데 바구니 항목과 짝이 맞는 것이 없습니다. 아래에서 칸마다 담을 항목을 골라 주세요.' });
+      return;
+    }
     var ov = t.over[b.bid] || {};
     t.map = t.heads.map(function (hd, j) {
       var m = matchField(b, hd), o = ov[j];
@@ -542,8 +559,39 @@
     if (!t.b) return [];
     return included(t.b).slice(0, t.limit).map(function (p, i) { return t.map.map(function (m) { return m.sel === '__seq' ? i + 1 : m.sel === '__none' ? undefined : asText ? valueOf(p, m.sel) : rawOf(p, m.sel); }); });
   }
+  /* ---------- 한 건마다 한 장: 이름표 칸(성명·주소…)의 오른쪽이나 아래 빈칸 찾기 ---------- */
+  function gridCells(g, merges) {
+    var cov = {}, mm = {}, out = [];
+    merges.forEach(function (m) { mm[m.r + ',' + m.c] = m; for (var i = 0; i < m.rs; i++) for (var j = 0; j < m.cs; j++) if (i || j) cov[(m.r + i) + ',' + (m.c + j)] = 1; });
+    g.forEach(function (row, r) { row.forEach(function (x, c) { if (cov[r + ',' + c]) return; var m = mm[r + ',' + c]; out.push({ r: r, c: c, rs: m ? m.rs : 1, cs: m ? m.cs : 1, t: txt(x) }); }); });
+    return out;
+  }
+  function formCands(cells) {
+    var at = {}, used = {}, out = [];
+    cells.forEach(function (c) { for (var i = 0; i < c.rs; i++) for (var j = 0; j < c.cs; j++) at[(c.r + i) + ',' + (c.c + j)] = c; });
+    cells.forEach(function (c) {
+      var t = c.t.replace(/\s+/g, ' ').replace(/\s*[:：]\s*$/, '').trim(); if (!t || t.length > 14 || /^[\d\s.,\-()]+$/.test(t) || /[{}]/.test(t)) return;
+      var tg = at[c.r + ',' + (c.c + c.cs)]; if (!(tg && tg !== c && !tg.t)) { tg = at[(c.r + c.rs) + ',' + c.c]; if (!(tg && tg !== c && !tg.t)) return; }
+      var k = tg.r + ',' + tg.c; if (used[k]) return; used[k] = 1;
+      out.push({ label: t, r: tg.r, c: tg.c });
+    });
+    return out;
+  }
+  function prepTpl(t) {   // 목록 모양인지, 한 건마다 한 장 모양인지 둘 다 살펴 둠
+    t.listOk = pickTab(t); t.cands = []; t.places = [];
+    if (t.kind === 'hwpx') {
+      t.tabs.forEach(function (tab, i) { if (tab.nested) return; formCands(tab.cells).forEach(function (cd) { cd.tab = i; t.cands.push(cd); }); });
+      var seen = {}; Object.keys(t.xmlOf).forEach(function (pth) { (t.xmlOf[pth].match(/\{[^{}<>]{1,20}\}/g) || []).forEach(function (m) { var n = m.slice(1, -1).trim(); if (n && !seen[n]) { seen[n] = 1; t.places.push(n); } }); });
+    } else {
+      var bi = t.listOk ? t.tab : 0, bn = -1;
+      if (!t.listOk) t.tabs.forEach(function (tab, i) { var n = formCands(tab.cells).length; if (n > bn) { bn = n; bi = i; } });
+      t.ftab = bi; formCands(t.tabs[bi].cells).forEach(function (cd) { cd.tab = bi; t.cands.push(cd); });
+    }
+    if (!t.listOk) { t.tab = t.kind === 'hwpx' ? 0 : t.ftab; t.h = 0; }
+    return t.listOk || t.cands.length >= 2 || t.places.length ? t : badTpl(t.name, NOLIST);
+  }
   function badTpl(name, why, fixes, tail) { return { id: ++tseq, name: name, bad: { why: why, fixes: fixes || [], tail: tail || '' } }; }
-  var NOLIST = '머리글 줄 아래에 빈 줄이 있는 목록 모양 표를 찾지 못했습니다. (한 건마다 한 장씩 뽑는 양식은 다음 단계에서 만듭니다)';
+  var NOLIST = '담을 자리를 찾지 못했습니다. 목록 모양이면 머리글 줄 아래에 빈 줄을, 한 건마다 한 장 모양이면 「성명」 같은 이름표 칸 옆에 빈칸을 두거나 문장 속에 {이름}처럼 적어 주세요.';
   function pickTab(t) {
     var best = -1, bs = 1, bh = 0;
     t.tabs.forEach(function (tab, i) { if (tab.nested) return; var s = headScore(tab.g); if (s.score > bs) { bs = s.score; best = i; bh = s.h; } });
@@ -555,13 +603,11 @@
       var ext = (f.name.split('.').pop() || '').toLowerCase();
       if (ext === 'xlsx' || ext === 'xlsm') return O.readBuf(f).then(function (ab) {
         var wb = XLSX.read(new Uint8Array(ab), { type: 'array', cellNF: true, sheetStubs: true });
-        var tabs = wb.SheetNames.map(function (n) { var ws = wb.Sheets[n], sg = XK.sheetGrid(ws), rg = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : { s: { r: 0, c: 0 } }; return { name: n, g: sg.g, merges: sg.merges, r0: rg.s.r, c0: rg.s.c }; });
-        var t = { id: ++tseq, name: f.name, kind: 'xlsx', ab: ab, tabs: tabs, over: {} };
-        return pickTab(t) ? t : badTpl(f.name, NOLIST);
+        var tabs = wb.SheetNames.map(function (n) { var ws = wb.Sheets[n], sg = XK.sheetGrid(ws), rg = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : { s: { r: 0, c: 0 } }; return { name: n, g: sg.g, merges: sg.merges, r0: rg.s.r, c0: rg.s.c, cells: gridCells(sg.g, sg.merges) }; });
+        return prepTpl({ id: ++tseq, name: f.name, kind: 'xlsx', ab: ab, tabs: tabs, over: {} });
       }, function () { return badTpl(f.name, '양식을 열지 못했습니다. 암호가 걸려 있으면 풀고 다시 넣어 주세요.'); });
       if (ext === 'hwpx') return O.readBuf(f).then(function (ab) { return parseHwpx(ab).then(function (h) {
-        var t = { id: ++tseq, name: f.name, kind: 'hwpx', ab: ab, tabs: h.tabs, xmlOf: h.xmlOf, over: {} };
-        return pickTab(t) ? t : badTpl(f.name, NOLIST);
+        return prepTpl({ id: ++tseq, name: f.name, kind: 'hwpx', ab: ab, tabs: h.tabs, xmlOf: h.xmlOf, over: {} });
       }); }, function () { return badTpl(f.name, '한글 양식을 열지 못했습니다.'); });
       if (ext === 'hwp') return Promise.resolve(badTpl(f.name, '옛 한글 형식(hwp) 양식은 바로 채우지 못합니다. ', [{ a: 'HWP → HWPX 바꾸기', u: TOOL + 'hwp2hwpx.html' }], ' 도구로 hwpx로 바꾼 뒤 다시 넣어 주세요. (한글에서 「다른 이름으로 저장 → hwpx」도 됩니다)'));
       if (ext === 'xls') return Promise.resolve(badTpl(f.name, '옛 엑셀 형식(xls) 양식은 서식을 지킨 채 채우지 못합니다. 엑셀에서 「다른 이름으로 저장 → xlsx」로 바꿔 다시 넣어 주세요.'));
@@ -573,19 +619,31 @@
     return '<option value="__none"' + (sel === '__none' ? ' selected' : '') + '>(비워 둠)</option><option value="__seq"' + (sel === '__seq' ? ' selected' : '') + '>(번호 1, 2, 3 … 자동)</option>' +
       b.fields.map(function (f) { return '<option value="' + esc(f) + '"' + (sel === f ? ' selected' : '') + '>' + esc(f) + '</option>'; }).join('');
   }
-  function tplAsk(t) { return t.bad ? 0 : t.map.filter(function (m) { return m.conf === 'ask'; }).length; }
+  function tplAsk(t) { return t.bad ? 0 : (t.shape === 'form' ? t.fmap.concat(t.pmap) : t.map).filter(function (m) { return m.conf === 'ask'; }).length; }
   function outName(t) { return t.name.replace(/\.[^.]+$/, '') + '_채움.' + t.kind; }
   function renderTpls() {
     var h = '';
     tpls.forEach(function (t) {
       if (t.bad) { h += '<div class="card bad"><h3>⚠ ' + esc(t.name) + ' <small>담을 수 없음</small><button type="button" class="btn mini" data-tdel="' + t.id + '">빼기</button></h3><p class="fix">' + esc(t.bad.why) + t.bad.fixes.map(function (x) { return '<a href="' + x.u + '" target="_blank" rel="noopener">' + esc(x.a) + ' ↗</a>'; }).join(' ') + esc(t.bad.tail) + '</p></div>'; return; }
       if (!t.b) { h += '<div class="card warn"><h3>' + esc(t.name) + '<button type="button" class="btn mini" data-tdel="' + t.id + '">빼기</button></h3><p class="fix">담을 바구니가 없습니다. 먼저 자료를 넣어 주세요.</p></div>'; return; }
-      var rows = tplRows(t, true), ask = tplAsk(t), tab = t.tabs[t.tab], b = t.b;
-      h += '<div class="card' + (ask || t.notes.some(function (n) { return n.warn; }) ? ' warn' : '') + '"><h3>' + (t.kind === 'hwpx' ? '📄' : '📗') + ' ' + esc(t.name) + ' <small>' + (t.kind === 'hwpx' ? '한글' : '엑셀') + ' · ' + esc(tab.name) + ' · 빈 줄 ' + t.cap + '개</small>' +
+      var rows = tplRows(t, true), ask = tplAsk(t), tab = t.tabs[t.tab], b = t.b, form = t.shape === 'form';
+      var shapeSel = t.canList && t.canForm ? '<label class="hint">담는 모양 <select data-shape="' + t.id + '"><option value="list"' + (form ? '' : ' selected') + '>목록 (한 표에 여러 줄)</option><option value="form"' + (form ? ' selected' : '') + '>한 건마다 한 장</option></select></label>' : '';
+      h += '<div class="card' + (ask || t.notes.some(function (n) { return n.warn; }) ? ' warn' : '') + '"><h3>' + (t.kind === 'hwpx' ? '📄' : '📗') + ' ' + esc(t.name) + ' <small>' + (t.kind === 'hwpx' ? '한글' : '엑셀') + ' · ' + (form ? '한 건마다 한 장 · 채울 자리 ' + (t.fmap.length + t.pmap.length) + '곳' : esc(tab.name) + ' · 빈 줄 ' + t.cap + '개') + '</small>' + shapeSel +
         (baskets.length > 1 ? '<label class="hint">담을 바구니 <select data-tb="' + t.id + '">' + baskets.map(function (x) { return '<option value="' + esc(x.bid) + '"' + (x === b ? ' selected' : '') + '>바구니 ' + x.no + ' (' + esc(x.srcs.map(shortNm).join(' + ').slice(0, 40)) + ')</option>'; }).join('') + '</select></label>' : '') +
-        '<label class="hint">머리글 줄 <input type="number" min="1" max="60" value="' + (t.h + 1) + '" data-thead="' + t.id + '" style="width:64px;padding:3px 6px"></label><button type="button" class="btn mini" data-tdel="' + t.id + '">빼기</button></h3>';
-      h += '<p class="fix"><span class="bk bk' + (b.no % 6) + '">🧺 바구니 ' + b.no + '</span> 을 이 그릇에 담습니다.</p>';
+        (form ? '' : '<label class="hint">머리글 줄 <input type="number" min="1" max="60" value="' + (t.h + 1) + '" data-thead="' + t.id + '" style="width:64px;padding:3px 6px"></label>') + '<button type="button" class="btn mini" data-tdel="' + t.id + '">빼기</button></h3>';
+      h += '<p class="fix"><span class="bk bk' + (b.no % 6) + '">🧺 바구니 ' + b.no + '</span> 을 이 그릇에 담습니다.' + (form ? ' 바구니의 한 줄마다 양식 한 장씩 만듭니다.' : '') + '</p>';
       t.notes.forEach(function (n) { h += '<p class="fix"' + (n.warn ? ' style="color:var(--amber)"' : '') + '>' + (n.warn ? '⚠ ' : 'ℹ ') + esc(n.t) + '</p>'; });
+      if (form) {
+        var inc = included(b), p0 = inc[0], all = t.fmap.map(function (m, i) { return { m: m, k: 'f', i: i }; }).concat(t.pmap.map(function (m, i) { return { m: m, k: 'p', i: i }; }));
+        h += '<div class="scroll"><table class="list"><tr><th>그릇(양식)의 자리</th><th>여기에 담을 것</th><th>상태</th><th>첫 건이 담긴 모습</th></tr>';
+        all.forEach(function (x) {
+          var m = x.m, st = m.conf === 'sure' ? '<span class="st sure">✓ 짝 맞음</span>' : m.conf === 'done' ? '<span class="st done">✓ 확인함</span>' : m.conf === 'ask' ? '<span class="st ask">? 확인 필요</span> <button type="button" class="btn mini" data-fok="' + t.id + SEP + x.k + SEP + x.i + '">맞아요</button><div class="why">' + esc(m.why) + '</div>' : '<span class="st new">비워 둠</span>';
+          h += '<tr class="' + (m.conf === 'ask' ? 'ask' : m.sel === '__none' ? 'skip' : '') + '"><td><b>' + esc(m.head) + '</b> <span class="hint">' + (x.k === 'p' ? '문장 속 자리' : '옆·아래 빈칸') + '</span></td><td><select data-fmap="' + t.id + SEP + x.k + SEP + x.i + '" aria-label="' + esc(m.head) + ' 자리에 담을 것"><option value="__none"' + (m.sel === '__none' ? ' selected' : '') + '>(비워 둠)</option>' + b.fields.map(function (f) { return '<option value="' + esc(f) + '"' + (m.sel === f ? ' selected' : '') + '>' + esc(f) + '</option>'; }).join('') + '</select></td><td>' + st + '</td><td class="ex">' + esc(p0 && m.sel !== '__none' ? valueOf(p0, m.sel) : '') + '</td></tr>';
+        });
+        h += '</table></div><div class="row" style="margin-top:10px"><button type="button" class="btn main" data-fzip="' + t.id + '"' + (inc.length ? '' : ' disabled') + '>' + inc.length + '건 → 파일 ' + inc.length + '개 묶음(zip)으로 받기</button>' +
+          (t.kind === 'hwpx' ? '<button type="button" class="btn" data-fall="' + t.id + '"' + (inc.length ? '' : ' disabled') + '>한 파일로 받기 (쪽마다 한 건)</button>' : '') + '<span class="hint">원래 양식 파일을 그대로 열어 자리만 채웁니다</span></div></div>';
+        return;
+      }
       h += '<div class="scroll"><table class="list"><tr><th>그릇(양식)의 칸</th><th>여기에 담을 것</th><th>상태</th></tr>';
       t.map.forEach(function (m, j) {
         var st = m.conf === 'sure' ? '<span class="st sure">✓ 짝 맞음</span>' : m.conf === 'done' ? '<span class="st done">✓ 확인함</span>' : m.conf === 'ask' ? '<span class="st ask">? 확인 필요</span> <button type="button" class="btn mini" data-tok="' + t.id + SEP + j + '">맞아요</button><div class="why">' + esc(m.why) + '</div>' : '<span class="st new">비워 둠</span>';
@@ -603,11 +661,20 @@
     if (d.tmap) { var a = d.tmap.split(SEP), t = tplById(a[0]); (t.over[t.b.bid] = t.over[t.b.bid] || {})[+a[1]] = e.target.value; mapTpl(t); renderTpls(); }
     else if (d.thead) { var t2 = tplById(d.thead); t2.h = Math.max(0, Math.min(t2.tabs[t2.tab].g.length - 1, (+e.target.value || 1) - 1)); t2.over = {}; mapTpl(t2); renderTpls(); }
     else if (d.tb) { var t3 = tplById(d.tb); t3.forceB = e.target.value; mapTpl(t3); renderTpls(); }
+    else if (d.shape) { var t4 = tplById(d.shape); t4.forceShape = e.target.value; mapTpl(t4); renderTpls(); }
+    else if (d.fmap) { var q = d.fmap.split(SEP), t5 = tplById(q[0]), kk = t5.b.bid + '|' + q[1]; (t5.over[kk] = t5.over[kk] || {})[+q[2]] = e.target.value; mapTpl(t5); renderTpls(); }
   });
   $('tplList').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     if (b.dataset.tdel) { tpls = tpls.filter(function (t) { return t.id !== +b.dataset.tdel; }); renderTpls(); }
     else if (b.dataset.tok) { var a = b.dataset.tok.split(SEP), t = tplById(a[0]); (t.over[t.b.bid] = t.over[t.b.bid] || {})[+a[1]] = t.map[+a[1]].sel; mapTpl(t); renderTpls(); }
+    else if (b.dataset.fok) { var q = b.dataset.fok.split(SEP), t5 = tplById(q[0]), kk = t5.b.bid + '|' + q[1]; (t5.over[kk] = t5.over[kk] || {})[+q[2]] = (q[1] === 'f' ? t5.fmap : t5.pmap)[+q[2]].sel; mapTpl(t5); renderTpls(); }
+    else if (b.dataset.fzip || b.dataset.fall) {
+      var one = !!b.dataset.fall, t6 = tplById(b.dataset.fzip || b.dataset.fall), n6 = included(t6.b).length, base6 = t6.name.replace(/\.[^.]+$/, '');
+      if (!okToGo(t6.b, tplAsk(t6))) return;
+      O.toast(n6 + '건을 담는 중입니다…', 8000);
+      (one ? formAll(t6) : formZip(t6)).then(function (blob) { O.download(one ? base6 + '_' + n6 + '건.hwpx' : base6 + '_' + n6 + '건.zip', blob); O.toast(n6 + '건을 담아 내려받았습니다.'); }, function (err) { O.toast('담지 못했습니다: ' + (err && err.message || err), 6000); });
+    }
     else if (b.dataset.fill) { var t3 = tplById(b.dataset.fill); if (!okToGo(t3.b, tplAsk(t3))) return; fill(t3).then(function (blob) { O.download(outName(t3), blob); O.toast(tplRows(t3).length + '줄을 담은 양식을 내려받았습니다.'); }, function (err) { O.toast('담지 못했습니다: ' + (err && err.message || err), 5000); }); }
   });
 
@@ -691,6 +758,82 @@
     });
   }
   function fill(t) { return t.kind === 'hwpx' ? fillHwpx(t, tplRows(t, true)) : fillXlsx(t, tplRows(t, false)); }
+  /* ---------- 한 건마다 한 장 ---------- */
+  function hwpxPack(t, xmlMap) {   // 바뀐 section XML만 갈아 끼워 다시 묶음 (mimetype 맨 앞·무압축)
+    return JSZip.loadAsync(t.ab).then(function (zip) {
+      var names = Object.keys(zip.files).filter(function (n) { return !zip.files[n].dir; });
+      names.sort(function (a, b) { return (a === 'mimetype' ? 0 : 1) - (b === 'mimetype' ? 0 : 1); });
+      return Promise.all(names.map(function (n) { return xmlMap[n] != null ? xmlMap[n] : zip.file(n).async('uint8array'); })).then(function (datas) {
+        var nz = new JSZip();
+        names.forEach(function (n, i) { nz.file(n, datas[i], n === 'mimetype' ? { compression: 'STORE' } : { compression: 'DEFLATE' }); });
+        return nz.generateAsync({ type: 'blob', mimeType: 'application/hwp+zip' });
+      });
+    });
+  }
+  function formXml(t, p) {   // 한 건을 담은 section XML들
+    var out = {}, byTab = {}, pv = {};
+    t.fmap.forEach(function (m, i) { if (m.sel === '__none') return; var cd = t.cands[i]; (byTab[cd.tab] = byTab[cd.tab] || {})[cd.r + ',' + cd.c] = valueOf(p, m.sel); });
+    t.pmap.forEach(function (m) { if (m.sel !== '__none') pv[m.name] = valueOf(p, m.sel); });
+    Object.keys(t.xmlOf).forEach(function (pth) {
+      var xml = t.xmlOf[pth];
+      t.tabs.map(function (tab, i) { return { tab: tab, i: i }; }).filter(function (x) { return x.tab.path === pth && byTab[x.i]; }).sort(function (a, b) { return b.tab.s - a.tab.s; }).forEach(function (x) {
+        var vals = byTab[x.i];
+        var tx = x.tab.tx.replace(/<hp:tc\b[\s\S]*?<\/hp:tc>/g, function (tc) { var c = +(tc.match(/colAddr="(\d+)"/) || [0, 0])[1], r = +(tc.match(/rowAddr="(\d+)"/) || [0, 0])[1], v = vals[r + ',' + c]; return v === undefined ? tc : setCell(tc, v); });
+        xml = xml.slice(0, x.tab.s) + tx + xml.slice(x.tab.e);
+      });
+      out[pth] = xml.replace(/\{([^{}<>]{1,20})\}/g, function (m, n) { n = n.trim(); return pv[n] !== undefined ? xe(pv[n]) : m; });
+    });
+    return out;
+  }
+  function formXlsx(t, p) {
+    return JSZip.loadAsync(t.ab).then(function (zip) {
+      var tab = t.tabs[t.ftab];
+      return sheetPath(zip, tab.name).then(function (path) {
+        return zip.file(path).async('string').then(function (xml) {
+          var doc = new DOMParser().parseFromString(xml, 'application/xml'), ns = doc.documentElement.namespaceURI, sd = doc.getElementsByTagNameNS(ns, 'sheetData')[0];
+          if (!sd) throw new Error('시트 내용을 읽지 못했습니다.');
+          t.fmap.forEach(function (m, i) {
+            if (m.sel === '__none') return;
+            var cd = t.cands[i], R = tab.r0 + cd.r + 1, ci = tab.c0 + cd.c, ref = XLSX.utils.encode_col(ci) + R, v = rawOf(p, m.sel), kids = sd.children, k, row = null, el = null;
+            for (k = 0; k < kids.length; k++) { var n = +kids[k].getAttribute('r'); if (n === R) { row = kids[k]; break; } if (n > R) break; }
+            if (!row) { row = doc.createElementNS(ns, 'row'); row.setAttribute('r', R); sd.insertBefore(row, kids[k] || null); }
+            kids = row.children;
+            for (k = 0; k < kids.length; k++) { var a = kids[k].getAttribute('r'); if (a === ref) { el = kids[k]; break; } if (XLSX.utils.decode_cell(a).c > ci) break; }
+            if (!el) { el = doc.createElementNS(ns, 'c'); el.setAttribute('r', ref); row.insertBefore(el, kids[k] || null); }
+            while (el.firstChild) el.removeChild(el.firstChild);
+            if (typeof v === 'number') { el.removeAttribute('t'); var ve = doc.createElementNS(ns, 'v'); ve.textContent = String(v); el.appendChild(ve); }
+            else if (v === '') el.removeAttribute('t');
+            else { el.setAttribute('t', 'inlineStr'); var is = doc.createElementNS(ns, 'is'), tt = doc.createElementNS(ns, 't'); tt.setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:space', 'preserve'); tt.textContent = v; is.appendChild(tt); el.appendChild(is); }
+          });
+          zip.file(path, '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + new XMLSerializer().serializeToString(doc.documentElement));
+          return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        });
+      });
+    });
+  }
+  function formOne(t, p) { return t.kind === 'hwpx' ? hwpxPack(t, formXml(t, p)) : formXlsx(t, p); }
+  function formZip(t) {   // 건마다 파일 하나 → zip
+    var items = included(t.b), nz = new JSZip(), used = {}, base = t.name.replace(/\.[^.]+$/, '');
+    return items.reduce(function (pr, p, i) {
+      return pr.then(function () { return formOne(t, p); }).then(function (blob) {
+        var nm = XK.fileSafe(base + '_' + (p.label || (i + 1))), b0 = nm, k = 2; while (used[nm]) nm = b0 + '(' + (k++) + ')'; used[nm] = 1;
+        nz.file(nm + '.' + t.kind, blob);
+      });
+    }, Promise.resolve()).then(function () { return nz.generateAsync({ type: 'blob', mimeType: 'application/zip' }); });
+  }
+  function formAll(t) {   // 한글: 한 파일에 쪽마다 한 건
+    var paths = Object.keys(t.xmlOf); if (t.kind !== 'hwpx' || paths.length !== 1) return Promise.reject(new Error('구역이 여러 개인 문서는 한 파일로 잇지 못합니다. 묶음(zip)으로 받아 주세요.'));
+    var pth = paths[0], filled = included(t.b).map(function (p) { return formXml(t, p)[pth]; }); if (!filled.length) return Promise.reject(new Error('담을 것이 없습니다.'));
+    var open = (filled[0].match(/^[\s\S]*?<hs:sec\b[^>]*>/) || [''])[0], close = '</hs:sec>'; if (!open) return Promise.reject(new Error('문서 구조를 읽지 못했습니다.'));
+    function inner(x) { return x.slice(open.length, x.lastIndexOf(close)); }
+    var body = inner(filled[0]) + filled.slice(1).map(function (x, i) {
+      return inner(x).replace(/(<hp:(?:tbl|pic|rect|line|ellipse|container|ole|equation|textart)\b[^>]*?\sid=")(\d+)/g, function (m, pre, id) { return pre + (+id + (i + 1) * 7); })   // 쪽마다 개체 번호가 겹치지 않게
+        .replace(/<hp:secPr\b[\s\S]*?<\/hp:secPr>/, '').replace(/<hp:ctrl>\s*<hp:colPr\b[^>]*\/>\s*<\/hp:ctrl>/, '')
+        .replace(/<hp:p\b[^>]*>/, function (m) { return /pageBreak="/.test(m) ? m.replace(/pageBreak="\d"/, 'pageBreak="1"') : m.replace(/>$/, ' pageBreak="1">'); });
+    }).join('');
+    var map = {}; map[pth] = open + body + close;
+    return hwpxPack(t, map);
+  }
 
   /* ================= 전체 다시 그리기 ================= */
   function refresh() { OWN = {}; srcs.forEach(analyze); plan(); renderSrcs(); renderBaskets(); tpls.forEach(mapTpl); renderTpls(); }
@@ -743,11 +886,18 @@
     for (var i = 0; i < 5; i++) rows.push(head.map(function () { return { t: '', align: 'center' }; }));
     return new File([Hwpx.textDoc([{ k: 'p', t: '비 상 연 락 망', align: 'center', style: 'title' }, { k: 'p', t: '(2026년 11월 기준)', align: 'right', style: 'text' }, { k: 'table', widths: [12, 22, 30, 62, 30, 14], rows: rows, h: 8 }, { k: 'p', t: '' }, { k: 'p', t: '○○기관', align: 'center', style: 'sub' }], '비상연락망')], '비상연락망 양식(예시).hwpx');
   }
+  function sampleTplF() {   // 한 건마다 한 장: 이름표 칸 옆 빈칸 + 문장 속 {자리}
+    var L = function (t) { return { t: t, gray: true }; }, E = function (cs) { return { t: '', cs: cs || 1 }; };
+    return new File([Hwpx.textDoc([{ k: 'p', t: '개 인 별  연 락 카 드', align: 'center', style: 'title' }, { k: 'p', t: '' },
+      { k: 'table', widths: [28, 57, 28, 57], rows: [[L('성명'), E(), L('소속'), E()], [L('연락처'), E(), L('비상연락처'), E()], [L('주소'), E(3)], [L('비고'), E(3)]], h: 11 },
+      { k: 'p', t: '' }, { k: 'p', t: '위 {이름} 님에게 급한 일이 생기면 {관계}({비상연락처})에게 먼저 연락합니다.', style: 'text' }, { k: 'p', t: '' }, { k: 'p', t: '○○기관', align: 'center', style: 'sub' }], '연락 카드')], '개인별 연락 카드 양식(예시).hwpx');
+  }
+  $('sampleTplF').onclick = function () { addTpls([sampleTplF()]); };
   $('sampleTplX').onclick = function () { addTpls([sampleTplX()]); };
   $('sampleTplH').onclick = function () { addTpls([sampleTplH()]); };
   $('sampleTplG').onclick = function () { addTpls([sampleTplG()]); };
 
   /* 시험 입구 */
-  window._mm = { addFiles: addFiles, addTpls: addTpls, sampleSrc: sampleSrc, sampleGoods: sampleGoods, sampleTplX: sampleTplX, sampleTplH: sampleTplH, sampleTplG: sampleTplG, fill: fill, tplRows: tplRows, issues: issues, valueOf: valueOf, rawOf: rawOf, refresh: refresh,
+  window._mm = { addFiles: addFiles, addTpls: addTpls, sampleSrc: sampleSrc, sampleGoods: sampleGoods, sampleTplX: sampleTplX, sampleTplH: sampleTplH, sampleTplG: sampleTplG, sampleTplF: sampleTplF, formOne: formOne, formZip: formZip, formAll: formAll, fill: fill, tplRows: tplRows, issues: issues, valueOf: valueOf, rawOf: rawOf, refresh: refresh,
     state: function () { return { srcs: srcs, baskets: baskets, tpls: tpls, pick: pick, ack: ack, edits: edits, off: off, bkOver: bkOver }; } };
 })();
