@@ -1,5 +1,5 @@
-/* 문서 변신 마법사 (시제품) — 뭐든 넣으면 자동 분리수거 → 바구니에 나눠 담기 → 원하는 그릇(내 양식)에 담기
-   원칙: 자동으로 분류하되, 애매한 것은 전부 표시해 확인받는다. 못 읽는 자료는 바꿔 올 도구를 알려 준다. */
+/* 문서 변신 마법사 (시제품) — 재료를 넣으면 알아서 구분 → 바구니에 나눠 담기 → 원하는 그릇(내 양식) 모양에 맞춰 담기
+   원칙: 자동으로 분류하되, 애매한 것은 전부 표시해 확인받는다. 못 읽는 재료는 바꿔 올 도구를 알려 준다. */
 (function () {
   'use strict';
   var O = Office, $ = O.$, esc = O.esc, txt = XK.txt, keyOf = XK.keyOf;
@@ -155,7 +155,7 @@
     });
   }
 
-  /* ================= ① 자료 (자동 분리수거의 재료) ================= */
+  /* ================= ① 재료 ================= */
   var srcs = [], seq = 0, OWN = {};
   function ownName(head) { var k = keyOf(head); return OWN[k] || (OWN[k] = head.trim()); }
   function mkSrc(name, kind, tabs) {
@@ -181,7 +181,7 @@
     });
     s.cols.forEach(function (col) {
       if (!col.f) return;
-      if (used[col.f] != null) { if (col.conf !== 'done') { col.conf = 'ask'; col.dup = true; col.why = '「' + col.f + '」 칸이 이 자료에 둘입니다. 이 칸은 무엇인지 골라 주세요(정하기 전에는 담지 않습니다).'; return; } }
+      if (used[col.f] != null) { if (col.conf !== 'done') { col.conf = 'ask'; col.dup = true; col.why = '「' + col.f + '」 칸이 이 재료에 둘입니다. 이 칸은 무엇인지 골라 주세요(정하기 전에는 담지 않습니다).'; return; } }
       else used[col.f] = col.i;
       if (s.F[col.f] == null) { s.F[col.f] = col; s.fields.push(col.f); }
     });
@@ -194,8 +194,8 @@
       c.keyable = !(F && F.nokey) && c.kind !== 'date' && (c.kind !== 'num' || idish) && n >= Math.max(1, rows.length * 0.9) && c.distinct >= n * 0.9;
     });
     var mg = (t.merges || []).filter(function (m) { return m.r > s.h; }).length;
-    if (mg) s.notes.push({ t: '자료 줄에 합친 칸이 ' + mg + '곳 있어 값이 빠질 수 있습니다. ', a: '표 청소기', u: TOOL + 'xlclean.html', t2: '로 풀어서 다시 넣으면 안전합니다.' });
-    if (!rows.length) s.notes.push({ t: '머리글 줄 아래에 자료가 없는 빈 표라 바구니에 담지 않았습니다. 채울 그릇(양식)이라면 아래 ③에 넣어 주세요. 자료가 맞다면 머리글 줄 번호를 고쳐 주세요.' });
+    if (mg) s.notes.push({ t: '재료 줄에 합친 칸이 ' + mg + '곳 있어 값이 빠질 수 있습니다. ', a: '표 청소기', u: TOOL + 'xlclean.html', t2: '로 풀어서 다시 넣으면 안전합니다.' });
+    if (!rows.length) s.notes.push({ t: '머리글 줄 아래에 재료가 없는 빈 표라 바구니에 담지 않았습니다. 채울 그릇(양식)이라면 아래 ③에 넣어 주세요. 재료가 맞다면 머리글 줄 번호를 고쳐 주세요.' });
   }
   var EXT_HELP = '원본 엑셀·한글 파일을 넣거나, 그 표를 복사해 「표를 복사해 붙여 넣기」로 넣어 주세요.';
   function addFiles(files) {
@@ -222,9 +222,9 @@
   function srcById(id) { return srcs.filter(function (s) { return s.id === +id; })[0]; }
   function shortNm(s) { return ((s && s.name) || '').replace(/\.[^.]+$/, ''); }
 
-  /* ================= ② 바구니 — 자동 분리수거 =================
-     · 칸 구성이 거의 같은 자료끼리 → 아래로 쌓기
-     · 값이 겹치는 기준 칸(이름·관리번호…)을 함께 가진 자료끼리 → 옆으로 맞추기
+  /* ================= ② 바구니 — 재료 구분 =================
+     · 칸 구성이 거의 같은 재료끼리 → 아래로 쌓기
+     · 값이 겹치는 기준 칸(이름·관리번호…)을 함께 가진 재료끼리 → 옆으로 맞추기
      · 아무 관계가 없으면 → 바구니를 따로 */
   var baskets = [], bkOver = {}, ack = {}, pick = {}, edits = {}, off = {};
   function relate(a, b) {
@@ -263,7 +263,7 @@
       function rk(f) { var x = KEYRANK.indexOf(f); return x < 0 ? 99 : x; }
       var kc = Object.keys(votes).sort(function (x, y) { return votes[y] - votes[x] || rk(x) - rk(y); });
       b.autoMode = ss.length === 1 || allStack || !kc.length ? 'stack' : 'join'; b.autoKey = kc[0] || null;
-      b.common = [];   // 기준 칸 후보: 자료 둘 이상에 있는 칸
+      b.common = [];   // 기준 칸 후보: 재료 둘 이상에 있는 칸
       var cnt = {}; ss.forEach(function (s) { s.fields.forEach(function (f) { cnt[f] = (cnt[f] || 0) + 1; }); });
       ss.forEach(function (s) { s.fields.forEach(function (f) { if (cnt[f] >= 2 && b.common.indexOf(f) < 0) b.common.push(f); }); });
       var o = bkOver[b.bid] || {};
@@ -271,7 +271,7 @@
       if (b.mode === 'join' && !b.key) b.mode = 'stack';
       b.key2 = b.mode === 'join' ? (o.key2 !== undefined ? o.key2 : (b.key === '이름' && cnt['생년월일'] >= 2 ? '생년월일' : '')) : '';
       if (b.key2 === b.key) b.key2 = '';
-      var pp = {}; ss.forEach(function (s) { pp[s.id] = s.id; });   // 묶음: 칸 구성이 같은 자료끼리(팀별 대장처럼 원래 서로 다른 것을 담은 자료)
+      var pp = {}; ss.forEach(function (s) { pp[s.id] = s.id; });   // 묶음: 칸 구성이 같은 재료끼리(팀별 대장처럼 원래 서로 다른 것을 담은 재료)
       function pf(x) { while (pp[x] !== x) x = pp[x]; return x; }
       for (var i2 = 0; i2 < ss.length; i2++) for (var j2 = i2 + 1; j2 < ss.length; j2++) { var q2 = rel[ss[i2].id + '-' + ss[j2].id]; if (q2 && q2.st && !(q2.key && q2.key.ov >= 0.5)) { var x1 = pf(ss[i2].id), x2 = pf(ss[j2].id); if (x1 !== x2) pp[Math.max(x1, x2)] = Math.min(x1, x2); } }
       var pm = {}; b.piles = []; ss.forEach(function (s) { var r2 = pf(s.id); if (!pm[r2]) { pm[r2] = []; b.piles.push(pm[r2]); } pm[r2].push(s); });
@@ -314,12 +314,12 @@
         s.rows.forEach(function (r, ri) {
           var m = { vals: {}, seen: {}, pid: P + s.id + ':' + ri }; m.seen[s.id] = 1;
           s.fields.forEach(function (f) { var e = entry(r[s.F[f].i], f, s.id); if (e) m.vals[f] = [e]; });
-          if (b.srcs.length > 1) m.vals['자료 이름'] = [{ v: shortNm(s), src: s.id }];
+          if (b.srcs.length > 1) m.vals['재료 이름'] = [{ v: shortNm(s), src: s.id }];
           m.label = (m.vals[fields[0]] || [{ v: '' }])[0].v;
           items.push(m);
         });
       });
-      if (b.srcs.length > 1) addField('자료 이름');
+      if (b.srcs.length > 1) addField('재료 이름');
     }
     b.items = items; b.fields = fields;
   }
@@ -333,19 +333,19 @@
       s.cols.forEach(function (c) { if (c.conf === 'ask') L.push({ id: P + 'col' + SEP + s.id + SEP + c.i, go: 'src' + s.id, col: s.id + SEP + c.i, dup: c.dup, t: '「' + s.name + '」의 「' + c.head + '」 칸 → ' + c.why }); });
     });
     if (b.mode === 'stack' && !(bkOver[b.bid] || {}).mode) b.amb.forEach(function (x) { L.push({ id: P + 'amb' + SEP + x[0].id + SEP + x[1].id, ackable: true, t: '「' + x[0].name + '」와 「' + x[1].name + '」는 칸 구성이 같으면서 「' + x[2] + '」 값도 많이 겹칩니다. 지금은 아래로 쌓았습니다. 같은 대상의 정보를 한 줄로 합치려면 위에서 「옆으로 맞추기」로 바꿔 주세요.' }); });
-    b.noKey.forEach(function (s) { L.push({ id: P + 'nokey' + SEP + s.id, block: true, go: 'src' + s.id, t: '「' + s.name + '」에는 기준 칸 「' + b.key + '」이(가) 없어 이 바구니에 담지 못했습니다. 자료 카드에서 그 칸을 골라 주거나 「따로 담기」로 바꿔 주세요.' }); });
+    b.noKey.forEach(function (s) { L.push({ id: P + 'nokey' + SEP + s.id, block: true, go: 'src' + s.id, t: '「' + s.name + '」에는 기준 칸 「' + b.key + '」이(가) 없어 이 바구니에 담지 못했습니다. 재료 카드에서 그 칸을 골라 주거나 「따로 담기」로 바꿔 주세요.' }); });
     if (b.mode === 'join') {
       inc.forEach(function (p) {
         b.fields.forEach(function (f) {
           var a = p.vals[f], k = p.pid + SEP + f;
-          if (a && a.length > 1 && pick[k] == null && edits[k] == null) L.push({ id: 'cf' + SEP + k, need: true, t: '「' + p.label + '」의 「' + f + '」이(가) 자료마다 다릅니다 — ' + a.map(function (e) { return e.v + ' (' + shortNm(srcById(e.src)) + ')'; }).join(' / ') + '. 아래 표의 노란 칸에서 골라 주세요.' });
+          if (a && a.length > 1 && pick[k] == null && edits[k] == null) L.push({ id: 'cf' + SEP + k, need: true, t: '「' + p.label + '」의 「' + f + '」이(가) 재료마다 다릅니다 — ' + a.map(function (e) { return e.v + ' (' + shortNm(srcById(e.src)) + ')'; }).join(' / ') + '. 아래 표의 노란 칸에서 골라 주세요.' });
         });
       });
-      Object.keys(b.homo).forEach(function (n) { var c = b.homo[n]; L.push({ id: P + 'homo' + SEP + n + SEP + c.length, ackable: true, t: '「' + b.key + '」이(가) 같은 「' + c[0].label + '」이(가) 한 자료 안에 ' + c.length + '줄입니다. 서로 다른 대상이 맞는지, 다른 자료의 정보가 맞는 줄에 붙었는지 봐 주세요.' }); });
+      Object.keys(b.homo).forEach(function (n) { var c = b.homo[n]; L.push({ id: P + 'homo' + SEP + n + SEP + c.length, ackable: true, t: '「' + b.key + '」이(가) 같은 「' + c[0].label + '」이(가) 한 재료 안에 ' + c.length + '줄입니다. 서로 다른 대상이 맞는지, 다른 재료의 정보가 맞는 줄에 붙었는지 봐 주세요.' }); });
       var piles = keyedPiles(b);
       if (piles.length > 1) piles.forEach(function (pl) {
         var miss = inc.filter(function (p) { return !pl.some(function (s) { return p.seen[s.id]; }); });
-        if (miss.length) L.push({ id: P + 'miss' + SEP + pl[0].id + SEP + miss.map(function (p) { return p.key + p.n; }).join(','), ackable: true, t: '「' + pl.map(shortNm).join(' + ') + '」에 없는 것 ' + miss.length + '건: ' + miss.slice(0, 8).map(function (p) { return p.label; }).join(', ') + (miss.length > 8 ? ' …' : '') + ' — 그 자료의 칸은 비어 있습니다.' });
+        if (miss.length) L.push({ id: P + 'miss' + SEP + pl[0].id + SEP + miss.map(function (p) { return p.key + p.n; }).join(','), ackable: true, t: '「' + pl.map(shortNm).join(' + ') + '」에 없는 것 ' + miss.length + '건: ' + miss.slice(0, 8).map(function (p) { return p.label; }).join(', ') + (miss.length > 8 ? ' …' : '') + ' — 그 재료의 칸은 비어 있습니다.' });
       });
     }
     L.forEach(function (i) { i.done = !!ack[i.id]; });
@@ -358,7 +358,7 @@
     return !n || confirm('아직 확인하지 않은 것이 ' + n + '개 있습니다.\n확인하지 않은 채로 받으면 틀린 값이 들어갈 수 있습니다. 그래도 받을까요?');
   }
 
-  /* ---------- 자료 카드 ---------- */
+  /* ---------- 재료 카드 ---------- */
   function fieldOpts(sel, head) {
     var h = '<option value="__own"' + (sel === '__own' ? ' selected' : '') + '>「' + esc(head) + '」 그대로</option><option value="__skip"' + (sel === '__skip' ? ' selected' : '') + '>담지 않음</option>';
     GROUPS.forEach(function (g) { h += '<optgroup label="' + g[0] + '">' + g[1].map(function (F) { return '<option value="' + F.id + '"' + (sel === F.id ? ' selected' : '') + '>' + F.id + '</option>'; }).join('') + '</optgroup>'; });
@@ -380,14 +380,14 @@
       }
       var ask = s.cols.filter(function (c) { return c.conf === 'ask'; }).length, b = s.bk;
       var others = srcs.filter(function (x) { return x !== s && !x.bad && x.rows.length; });
-      h += '<div class="card' + (ask ? ' warn' : '') + '" id="src' + s.id + '"><h3>' + (s.kind === '한글' ? '📄' : '📗') + ' ' + esc(s.name) + ' <small>' + s.kind + ' · 자료 ' + s.rows.length + '줄</small>' +
+      h += '<div class="card' + (ask ? ' warn' : '') + '" id="src' + s.id + '"><h3>' + (s.kind === '한글' ? '📄' : '📗') + ' ' + esc(s.name) + ' <small>' + s.kind + ' · 재료 ' + s.rows.length + '줄</small>' +
         (s.tabs.length > 1 ? '<label class="hint">' + (s.kind === '한글' ? '표' : '시트') + ' <select data-tab="' + s.id + '">' + s.tabs.map(function (x, i) { return '<option value="' + i + '"' + (i === s.tab ? ' selected' : '') + '>' + esc(x.name) + '</option>'; }).join('') + '</select></label>' : '') +
         '<label class="hint">머리글 줄 <input type="number" min="1" max="60" value="' + (s.h + 1) + '" data-head="' + s.id + '" style="width:64px;padding:3px 6px"></label>' +
         '<button type="button" class="btn mini" data-del="' + s.id + '">빼기</button></h3>';
-      if (b) h += '<p class="fix"><span class="bk bk' + (b.no % 6) + '">🧺 바구니 ' + b.no + '</span> 에 담았습니다' + (b.srcs.length > 1 ? ' — ' + (b.mode === 'join' ? (s.F[b.key] ? '「' + esc(b.key) + '」(으)로 다른 자료와 옆으로 맞춤' : '기준 칸 「' + esc(b.key) + '」이(가) 없어 아직 담기지 않음') : '칸 구성이 같은 자료와 아래로 쌓음') : ' — 관계있는 다른 자료가 없어 혼자 담김') +
+      if (b) h += '<p class="fix"><span class="bk bk' + (b.no % 6) + '">🧺 바구니 ' + b.no + '</span> 에 담았습니다' + (b.srcs.length > 1 ? ' — ' + (b.mode === 'join' ? (s.F[b.key] ? '「' + esc(b.key) + '」(으)로 다른 재료와 옆으로 맞춤' : '기준 칸 「' + esc(b.key) + '」이(가) 없어 아직 담기지 않음') : '칸 구성이 같은 재료와 아래로 쌓음') : ' — 관계있는 다른 재료가 없어 혼자 담김') +
         (others.length ? ' <label class="hint">담는 곳 <select data-force="' + s.id + '"><option value="">자동</option><option value="solo"' + (s.force === 'solo' ? ' selected' : '') + '>따로 담기</option>' + others.map(function (x) { return '<option value="with:' + x.id + '"' + (s.force === 'with:' + x.id ? ' selected' : '') + '>「' + esc(shortNm(x)) + '」와 같은 바구니</option>'; }).join('') + '</select></label>' : '') + '</p>';
       s.notes.forEach(function (n) { h += '<p class="fix">⚠ ' + esc(n.t) + (n.a ? '<a href="' + n.u + '" target="_blank" rel="noopener">' + esc(n.a) + ' ↗</a>' + esc(n.t2 || '') : '') + '</p>'; });
-      h += '<div class="scroll"><table class="list"><tr><th>자료의 머리글</th><th>들어 있는 값 (예)</th><th>바구니 항목</th><th>상태</th></tr>';
+      h += '<div class="scroll"><table class="list"><tr><th>재료의 머리글</th><th>들어 있는 값 (예)</th><th>바구니 항목</th><th>상태</th></tr>';
       s.cols.forEach(function (c) {
         h += '<tr class="' + (c.conf === 'ask' ? 'ask' : c.sel === '__skip' ? 'skip' : '') + '"><td><b>' + esc(c.head) + '</b></td><td class="ex" title="' + esc(c.ex) + '">' + esc(c.ex || '(빈 칸)') + '</td>' +
           '<td><select data-col="' + s.id + SEP + c.i + '" aria-label="' + esc(c.head) + ' 칸의 항목">' + fieldOpts(c.sel, c.head) + '</select></td>' +
@@ -416,8 +416,8 @@
     var has = srcs.some(function (s) { return !s.bad; });
     $('basketPanel').hidden = !has; $('tplPanel').hidden = !baskets.length;
     if (!has) return;
-    if (!baskets.length) { $('basketList').innerHTML = '<p class="hint">아직 바구니에 담긴 것이 없습니다. 위 자료 카드의 안내를 봐 주세요.</p>'; return; }
-    var h = baskets.length > 1 ? '<p class="fix">넣은 자료가 서로 다른 종류라 <b>바구니 ' + baskets.length + '개</b>로 나눠 담았습니다. 한 바구니로 합치려면 위 자료 카드의 「담는 곳」을 바꿔 주세요.</p>' : '';
+    if (!baskets.length) { $('basketList').innerHTML = '<p class="hint">아직 바구니에 담긴 것이 없습니다. 위 재료 카드의 안내를 봐 주세요.</p>'; return; }
+    var h = baskets.length > 1 ? '<p class="fix">넣은 재료가 서로 다른 종류라 <b>바구니 ' + baskets.length + '개</b>로 나눠 담았습니다. 한 바구니로 합치려면 위 재료 카드의 「담는 곳」을 바꿔 주세요.</p>' : '';
     baskets.forEach(function (b) {
       var L = issues(b), todo = L.filter(function (i) { return !i.done; }).length, inc = included(b), B = esc(b.bid), o = bkOver[b.bid] || {};
       h += '<div class="card" id="bk' + B + '"><h3><span class="bk bk' + (b.no % 6) + '">🧺 바구니 ' + b.no + '</span> <small>' + b.srcs.map(function (s) { return esc(shortNm(s)); }).join(' + ') + '</small></h3>';
@@ -425,15 +425,15 @@
         h += '<div class="row" style="margin:8px 0 2px"><label class="hint">담는 방식 <select data-mode="' + B + '"><option value="join"' + (b.mode === 'join' ? ' selected' : '') + (b.common.length ? '' : ' disabled') + '>옆으로 맞추기 (같은 대상을 한 줄로)</option><option value="stack"' + (b.mode === 'stack' ? ' selected' : '') + '>아래로 쌓기 (줄을 이어 붙임)</option></select></label>';
         if (b.mode === 'join') h += '<label class="hint">기준 칸 <select data-key="' + B + '">' + b.common.map(function (f) { return '<option' + (f === b.key ? ' selected' : '') + '>' + esc(f) + '</option>'; }).join('') + '</select></label>' +
           '<label class="hint">함께 볼 칸 <select data-key2="' + B + '"><option value="">(없음)</option>' + b.common.filter(function (f) { return f !== b.key; }).map(function (f) { return '<option' + (f === b.key2 ? ' selected' : '') + '>' + esc(f) + '</option>'; }).join('') + '</select></label>';
-        h += '</div><p class="hint" style="margin:2px 0 8px">' + (b.mode === 'join' ? '「' + esc(b.key) + '」이(가) 같으면 같은 대상으로 보고, 자료마다 흩어진 정보를 한 줄에 모았습니다.' + (b.key2 ? ' 같은 값이 여럿이면 「' + esc(b.key2) + '」도 함께 봅니다.' : '') : '칸 구성이 같은 자료라 줄을 그대로 이어 붙였습니다. 어느 자료에서 왔는지 「자료 이름」 칸에 적었습니다.') + (o.mode || o.key ? '' : ' <b>(자동으로 정함 — 다르면 위에서 바꾸세요)</b>') + '</p>';
+        h += '</div><p class="hint" style="margin:2px 0 8px">' + (b.mode === 'join' ? '「' + esc(b.key) + '」이(가) 같으면 같은 대상으로 보고, 재료마다 흩어진 정보를 한 줄에 모았습니다.' + (b.key2 ? ' 같은 값이 여럿이면 「' + esc(b.key2) + '」도 함께 봅니다.' : '') : '칸 구성이 같은 재료라 줄을 그대로 이어 붙였습니다. 어느 재료에서 왔는지 「재료 이름」 칸에 적었습니다.') + (o.mode || o.key ? '' : ' <b>(자동으로 정함 — 다르면 위에서 바꾸세요)</b>') + '</p>';
       }
       h += '<div class="sum"><span class="pill">' + inc.length + '줄' + (inc.length < b.items.length ? ' (뺀 줄 ' + (b.items.length - inc.length) + ')' : '') + '</span><span class="pill">항목 ' + b.fields.length + '개</span>' + (todo ? '<span class="pill todo">확인할 것 ' + todo + '개</span>' : '<span class="pill ok">✓ 확인할 것 없음</span>') + '</div>';
       h += '<ul class="issues">' + L.map(function (i) {
         return '<li class="' + (i.done ? 'done' : i.block || i.need ? 'block' : '') + '"><span class="t">' + (i.done ? '✓ ' : '') + esc(i.t) + '</span>' +
-          (i.done ? '' : i.col ? '<button type="button" class="btn mini" data-colok="' + i.col + '">' + (i.dup ? '이대로 둘 다 쓰기' : '맞아요') + '</button><button type="button" class="btn mini" data-go="' + i.go + '">자료에서 고치기</button>' : i.go ? '<button type="button" class="btn mini" data-go="' + i.go + '">자료로 가기</button>' : i.ackable ? '<button type="button" class="btn mini" data-ack="' + esc(i.id) + '">확인했어요</button>' : '') + '</li>';
+          (i.done ? '' : i.col ? '<button type="button" class="btn mini" data-colok="' + i.col + '">' + (i.dup ? '이대로 둘 다 쓰기' : '맞아요') + '</button><button type="button" class="btn mini" data-go="' + i.go + '">재료에서 고치기</button>' : i.go ? '<button type="button" class="btn mini" data-go="' + i.go + '">재료로 가기</button>' : i.ackable ? '<button type="button" class="btn mini" data-ack="' + esc(i.id) + '">확인했어요</button>' : '') + '</li>';
       }).join('') + '</ul>';
       var keyed = b.mode === 'join' ? keyedPiles(b) : [], showSrc = keyed.length > 1;
-      h += '<div class="pv"><table><tr><th>담기</th>' + b.fields.map(function (f) { return '<th>' + esc(f) + (f === b.key ? ' 🔑' : '') + '</th>'; }).join('') + (showSrc ? '<th>나온 자료</th>' : '') + '</tr>';
+      h += '<div class="pv"><table><tr><th>담기</th>' + b.fields.map(function (f) { return '<th>' + esc(f) + (f === b.key ? ' 🔑' : '') + '</th>'; }).join('') + (showSrc ? '<th>나온 재료</th>' : '') + '</tr>';
       b.items.slice(0, SHOWMAX).forEach(function (p) {
         h += '<tr class="' + (off[p.pid] ? 'off ' : '') + (b.homo[p.key] ? 'flag' : '') + '"><td style="text-align:center"><input type="checkbox" data-off="' + esc(p.pid) + '"' + (off[p.pid] ? '' : ' checked') + ' aria-label="' + esc(p.label) + ' 담기"></td>';
         b.fields.forEach(function (f) {
@@ -445,7 +445,7 @@
         h += '</tr>';
       });
       h += '</table>' + (b.items.length > SHOWMAX ? '<p class="hint" style="padding:4px 8px;margin:0">… 앞 ' + SHOWMAX + '줄만 보입니다(모두 ' + b.items.length + '줄). 받는 파일에는 모두 들어갑니다.</p>' : '') +
-        (showSrc ? '<p class="hint" style="padding:4px 8px;margin:0">나온 자료 번호: ' + keyed.map(function (pl, i) { return (i + 1) + ' = ' + esc(pl.map(shortNm).join(' + ')); }).join(' · ') + '</p>' : '') + '</div>' +
+        (showSrc ? '<p class="hint" style="padding:4px 8px;margin:0">나온 재료 번호: ' + keyed.map(function (pl, i) { return (i + 1) + ' = ' + esc(pl.map(shortNm).join(' + ')); }).join(' · ') + '</p>' : '') + '</div>' +
         '<div class="row" style="margin-top:10px"><button type="button" class="btn" data-bx="' + B + '">이 바구니를 엑셀로 받기</button><span class="hint">그릇(양식) 없이 모은 표만 필요할 때</span></div></div>';
     });
     $('basketList').innerHTML = h;
@@ -625,7 +625,7 @@
     var h = '';
     tpls.forEach(function (t) {
       if (t.bad) { h += '<div class="card bad"><h3>⚠ ' + esc(t.name) + ' <small>담을 수 없음</small><button type="button" class="btn mini" data-tdel="' + t.id + '">빼기</button></h3><p class="fix">' + esc(t.bad.why) + t.bad.fixes.map(function (x) { return '<a href="' + x.u + '" target="_blank" rel="noopener">' + esc(x.a) + ' ↗</a>'; }).join(' ') + esc(t.bad.tail) + '</p></div>'; return; }
-      if (!t.b) { h += '<div class="card warn"><h3>' + esc(t.name) + '<button type="button" class="btn mini" data-tdel="' + t.id + '">빼기</button></h3><p class="fix">담을 바구니가 없습니다. 먼저 자료를 넣어 주세요.</p></div>'; return; }
+      if (!t.b) { h += '<div class="card warn"><h3>' + esc(t.name) + '<button type="button" class="btn mini" data-tdel="' + t.id + '">빼기</button></h3><p class="fix">담을 바구니가 없습니다. 먼저 재료를 넣어 주세요.</p></div>'; return; }
       var rows = tplRows(t, true), ask = tplAsk(t), tab = t.tabs[t.tab], b = t.b, form = t.shape === 'form';
       var shapeSel = t.canList && t.canForm ? '<label class="hint">담는 모양 <select data-shape="' + t.id + '"><option value="list"' + (form ? '' : ' selected') + '>목록 (한 표에 여러 줄)</option><option value="form"' + (form ? ' selected' : '') + '>한 건마다 한 장</option></select></label>' : '';
       h += '<div class="card' + (ask || t.notes.some(function (n) { return n.warn; }) ? ' warn' : '') + '"><h3>' + (t.kind === 'hwpx' ? '📄' : '📗') + ' ' + esc(t.name) + ' <small>' + (t.kind === 'hwpx' ? '한글' : '엑셀') + ' · ' + (form ? '한 건마다 한 장 · 채울 자리 ' + (t.fmap.length + t.pmap.length) + '곳' : esc(tab.name) + ' · 빈 줄 ' + t.cap + '개') + '</small>' + shapeSel +
@@ -848,7 +848,7 @@
     addPasted(m); $('pasteArea').value = '';
   });
 
-  /* ================= 예시 (모두 가상 자료) ================= */
+  /* ================= 예시 (모두 가상 재료) ================= */
   var NAMES = ['김하늘', '이바다', '박구름', '최별', '정나무', '한들꽃', '오솔길', '윤햇살', '서은빛', '장마루'];
   var TEAMS = ['가나팀', '다라팀', '마바팀'], REL = ['배우자', '자녀', '부모', '형제', '자녀', '배우자', '친구', '자녀', '부모', '배우자'];
   var ROADS = ['나래로', '새솔길', '한빛로', '도담길', '온누리로'];

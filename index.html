@@ -73,29 +73,29 @@ textarea{width:100%}
 <body>
 <div class="wrap">
   <div class="hero"><h1>🪄 문서 변신 마법사</h1><span class="badge">시제품 · 비공개</span></div>
-  <p class="sub"><b>뭐든 넣으면 자동으로 분리수거</b>해서 바구니에 나눠 담고, 원하는 <b>그릇(내 양식)</b>을 넣으면 그 칸에 맞춰 담아 줍니다. 마법처럼 한 번에 끝나지는 않습니다 — <b>애매한 것은 노랗게 표시</b>하니 확인하고 넘어가세요. 넣은 자료는 이 컴퓨터 밖으로 나가지 않습니다.</p>
-  <div class="flow"><span>① 뭐든 넣기</span><i>→</i><span>② 자동 분리수거 · 바구니 확인</span><i>→</i><span>③ 그릇(내 양식) 넣기</span><i>→</i><span>④ 담아서 받기</span></div>
+  <p class="sub"><b>재료를 넣으면 알아서 구분해 바구니에 나눠 담고</b>, 원하는 <b>그릇(내 양식)</b>을 넣으면 그 모양에 맞춰 담아 줍니다. 마법처럼 한 번에 끝나지는 않습니다 — <b>애매한 것은 노랗게 표시</b>하니 확인하고 넘어가세요. 넣은 재료는 이 컴퓨터 밖으로 나가지 않습니다.</p>
+  <div class="flow"><span>① 재료 넣기</span><i>→</i><span>② 재료 구분 · 바구니 확인</span><i>→</i><span>③ 그릇(내 양식) 넣기</span><i>→</i><span>④ 담아서 받기</span></div>
 
   <section class="panel">
-    <div class="step"><span class="n">1</span><h2>뭐든 넣기</h2><span class="hint">종류가 달라도 한꺼번에 · 나중에 더 넣어도 됩니다</span></div>
+    <div class="step"><span class="n">1</span><h2>재료 넣기</h2><span class="hint">종류가 달라도 한꺼번에 · 나중에 더 넣어도 됩니다</span></div>
     <div class="drop" id="dropIn">
-      <b>자료가 든 파일들을 여기에 끌어다 놓기</b>
+      <b>재료가 든 파일들을 여기에 끌어다 놓기</b>
       <div class="hint" style="margin-bottom:8px">엑셀(xlsx·xls·csv) · 표가 든 한글(hwpx) — 명단·대장·내역 무엇이든. 알아서 같은 것끼리 모읍니다</div>
       <label class="btn"><input type="file" id="fileIn" multiple hidden>파일 고르기</label>
-      <button type="button" class="btn" id="sampleIn">예시 ① 사람 자료 3개</button>
-      <button type="button" class="btn" id="sampleIn2">예시 ② 물품 자료 3개</button>
+      <button type="button" class="btn" id="sampleIn">예시 ① 사람 재료 3개</button>
+      <button type="button" class="btn" id="sampleIn2">예시 ② 물품 재료 3개</button>
       <button type="button" class="btn" id="pasteBtn">표를 복사해 붙여 넣기</button>
     </div>
     <div id="pasteBox" hidden style="margin-top:10px">
-      <textarea id="pasteArea" rows="4" placeholder="엑셀·한글·누리집의 표를 복사(Ctrl+C)해 여기에 붙여 넣기(Ctrl+V) — 붙이면 자료 하나로 들어갑니다"></textarea>
+      <textarea id="pasteArea" rows="4" placeholder="엑셀·한글·누리집의 표를 복사(Ctrl+C)해 여기에 붙여 넣기(Ctrl+V) — 붙이면 재료 하나로 들어갑니다"></textarea>
     </div>
     <div id="srcList"></div>
   </section>
 
   <section class="panel" id="basketPanel" hidden>
-    <div class="step"><span class="n">2</span><h2>바구니 확인</h2><span class="hint">자동으로 분리수거한 결과 — 같은 것끼리 한 바구니에</span></div>
+    <div class="step"><span class="n">2</span><h2>바구니 확인</h2><span class="hint">재료를 구분해 담은 결과 — 같은 것끼리 한 바구니에</span></div>
     <div id="basketList"></div>
-    <div class="legend"><span><i style="background:#ffe9a8"></i>자료마다 값이 다름 — 골라 주세요</span><span><i style="background:#eaf6ee"></i>고른 값</span><span><i style="background:#e8f0ff"></i>직접 고친 값</span><span><i style="background:#fafafa"></i>어느 자료에도 없음</span><span>🔑 = 같은 대상인지 맞춰 본 기준 칸</span><span>칸을 눌러 바로 고칠 수 있습니다 · 줄 앞 체크를 끄면 그 줄은 뺍니다</span></div>
+    <div class="legend"><span><i style="background:#ffe9a8"></i>재료마다 값이 다름 — 골라 주세요</span><span><i style="background:#eaf6ee"></i>고른 값</span><span><i style="background:#e8f0ff"></i>직접 고친 값</span><span><i style="background:#fafafa"></i>어느 재료에도 없음</span><span>🔑 = 같은 대상인지 맞춰 본 기준 칸</span><span>칸을 눌러 바로 고칠 수 있습니다 · 줄 앞 체크를 끄면 그 줄은 뺍니다</span></div>
   </section>
 
   <section class="panel" id="tplPanel" hidden>
@@ -115,9 +115,9 @@ textarea{width:100%}
   <section class="panel">
     <h2>알아 두기 (시제품)</h2>
     <ul class="hint" style="margin:0;padding-left:18px">
-      <li><b>분리수거 규칙</b> — 칸 구성이 거의 같은 자료는 <b>아래로 쌓고</b>, 이름·관리번호처럼 값이 겹치는 칸을 함께 가진 자료는 그 칸을 기준으로 <b>옆으로 맞추고</b>, 서로 관계없는 자료는 <b>바구니를 따로</b> 둡니다. 자동으로 정한 것은 바구니에서 바꿀 수 있습니다.</li>
+      <li><b>재료를 구분하는 규칙</b> — 칸 구성이 거의 같은 재료는 <b>아래로 쌓고</b>, 이름·관리번호처럼 값이 겹치는 칸을 함께 가진 재료는 그 칸을 기준으로 <b>옆으로 맞추고</b>, 서로 관계없는 재료는 <b>바구니를 따로</b> 둡니다. 자동으로 정한 것은 바구니에서 바꿀 수 있습니다.</li>
       <li>머리글은 사전에 있는 낱말이면 같은 뜻끼리 묶고(성명=이름, 휴대폰=연락처), 처음 보는 머리글은 그대로 항목이 됩니다.</li>
-      <li>읽기 어려운 자료는 억지로 읽지 않고, <b>먼저 바꿔 올 도구</b>를 알려 드립니다(옛 hwp → hwpx, 합친 칸이 많은 엑셀 → 표 청소기).</li>
+      <li>읽기 어려운 재료는 억지로 읽지 않고, <b>먼저 바꿔 올 도구</b>를 알려 드립니다(옛 hwp → hwpx, 합친 칸이 많은 엑셀 → 표 청소기).</li>
       <li>그릇은 <b>원래 파일을 그대로 열어 칸만 채웁니다</b> — 글꼴·테두리·제목이 그대로 남습니다. 빈 줄이 모자라면 마지막 빈 줄을 본떠 늘립니다.</li>
       <li><b>한 건마다 한 장</b> — 「성명」「주소」 같은 이름표 칸의 오른쪽이나 아래 빈칸을 찾아 채우고, 문장 속에는 <b>{이름}</b>처럼 중괄호로 적어 둔 자리를 바꿉니다. 건마다 파일 하나씩 묶음(zip)으로, 한글은 한 파일에 쪽마다 한 건으로도 받습니다.</li>
       <li>아직 안 되는 것: PDF·사진 속 표, 거래 내역에 거래처 정보 붙이기 같은 「여러 줄 ↔ 한 줄」 맞추기, 「이 변신 저장」.</li>
@@ -131,6 +131,6 @@ textarea{width:100%}
 <script src="lib/hwpx.js?v=1"></script>
 <script src="lib/xlsxw.js?v=1"></script>
 <script src="lib/xlkit.js?v=1"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
