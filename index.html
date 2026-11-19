@@ -62,6 +62,10 @@ ul.issues li .t{flex:1;min-width:220px}
 .pv .src{color:#888;font-size:.74rem}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.8rem;color:var(--muted);margin:6px 0 0}
 .legend i{display:inline-block;width:14px;height:14px;border:1px solid #bbb;vertical-align:-2px;margin-right:4px}
+.bk{display:inline-block;font-size:.82rem;font-weight:700;padding:2px 10px;border-radius:99px;color:#fff;background:#1A6EFF}
+.bk1{background:#1A6EFF}.bk2{background:#1D7A46}.bk3{background:#C2491D}.bk4{background:#7B3FBF}.bk5{background:#0E7C86}.bk0{background:#8A5A00}
+.pv td.num{text-align:right}
+#basketList>.card{border-width:2px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1A2B50;color:#fff;padding:10px 16px;border-radius:10px;font-size:.9rem;z-index:50;max-width:90vw}
 textarea{width:100%}
 </style>
@@ -69,16 +73,17 @@ textarea{width:100%}
 <body>
 <div class="wrap">
   <div class="hero"><h1>🪄 문서 변신 마법사</h1><span class="badge">시제품 · 비공개</span></div>
-  <p class="sub">흩어진 자료를 넣으면 <b>한 바구니</b>로 모으고, 내 양식을 넣으면 그 칸에 맞춰 채워 줍니다. 마법처럼 한 번에 끝나지는 않습니다 — <b>애매한 것은 노랗게 표시</b>하니 확인하고 넘어가세요. 넣은 자료는 이 컴퓨터 밖으로 나가지 않습니다.</p>
-  <div class="flow"><span>① 자료 넣기</span><i>→</i><span>② 바구니 확인</span><i>→</i><span>③ 내 양식 넣기</span><i>→</i><span>④ 채워진 파일 받기</span></div>
+  <p class="sub"><b>뭐든 넣으면 자동으로 분리수거</b>해서 바구니에 나눠 담고, 원하는 <b>그릇(내 양식)</b>을 넣으면 그 칸에 맞춰 담아 줍니다. 마법처럼 한 번에 끝나지는 않습니다 — <b>애매한 것은 노랗게 표시</b>하니 확인하고 넘어가세요. 넣은 자료는 이 컴퓨터 밖으로 나가지 않습니다.</p>
+  <div class="flow"><span>① 뭐든 넣기</span><i>→</i><span>② 자동 분리수거 · 바구니 확인</span><i>→</i><span>③ 그릇(내 양식) 넣기</span><i>→</i><span>④ 담아서 받기</span></div>
 
   <section class="panel">
-    <div class="step"><span class="n">1</span><h2>자료 넣기</h2><span class="hint">여러 개를 한꺼번에 · 나중에 더 넣어도 됩니다</span></div>
+    <div class="step"><span class="n">1</span><h2>뭐든 넣기</h2><span class="hint">종류가 달라도 한꺼번에 · 나중에 더 넣어도 됩니다</span></div>
     <div class="drop" id="dropIn">
       <b>자료가 든 파일들을 여기에 끌어다 놓기</b>
-      <div class="hint" style="margin-bottom:8px">엑셀(xlsx·xls·csv) · 표가 든 한글(hwpx) — 사람 이름이 든 표여야 합칠 수 있습니다</div>
+      <div class="hint" style="margin-bottom:8px">엑셀(xlsx·xls·csv) · 표가 든 한글(hwpx) — 명단·대장·내역 무엇이든. 알아서 같은 것끼리 모읍니다</div>
       <label class="btn"><input type="file" id="fileIn" multiple hidden>파일 고르기</label>
-      <button type="button" class="btn" id="sampleIn">예시 자료 3개로 해 보기</button>
+      <button type="button" class="btn" id="sampleIn">예시 ① 사람 자료 3개</button>
+      <button type="button" class="btn" id="sampleIn2">예시 ② 물품 자료 3개</button>
       <button type="button" class="btn" id="pasteBtn">표를 복사해 붙여 넣기</button>
     </div>
     <div id="pasteBox" hidden style="margin-top:10px">
@@ -88,22 +93,20 @@ textarea{width:100%}
   </section>
 
   <section class="panel" id="basketPanel" hidden>
-    <div class="step"><span class="n">2</span><h2>바구니 확인</h2><span class="hint">자료에서 모은 정보를 사람마다 한 줄로</span></div>
-    <div class="sum" id="basketSum"></div>
-    <ul class="issues" id="issueList"></ul>
-    <div class="pv" id="basketPv"></div>
-    <div class="legend"><span><i style="background:#ffe9a8"></i>자료마다 값이 다름 — 골라 주세요</span><span><i style="background:#eaf6ee"></i>고른 값</span><span><i style="background:#e8f0ff"></i>직접 고친 값</span><span><i style="background:#fafafa"></i>어느 자료에도 없음</span><span>칸을 눌러 바로 고칠 수 있습니다 · 줄 앞 체크를 끄면 그 사람은 뺍니다</span></div>
-    <div class="row" style="margin-top:10px"><button type="button" class="btn" id="basketXlsx">바구니를 엑셀로 받기</button><span class="hint">양식 없이 합친 표만 필요할 때</span></div>
+    <div class="step"><span class="n">2</span><h2>바구니 확인</h2><span class="hint">자동으로 분리수거한 결과 — 같은 것끼리 한 바구니에</span></div>
+    <div id="basketList"></div>
+    <div class="legend"><span><i style="background:#ffe9a8"></i>자료마다 값이 다름 — 골라 주세요</span><span><i style="background:#eaf6ee"></i>고른 값</span><span><i style="background:#e8f0ff"></i>직접 고친 값</span><span><i style="background:#fafafa"></i>어느 자료에도 없음</span><span>🔑 = 같은 대상인지 맞춰 본 기준 칸</span><span>칸을 눌러 바로 고칠 수 있습니다 · 줄 앞 체크를 끄면 그 줄은 뺍니다</span></div>
   </section>
 
   <section class="panel" id="tplPanel" hidden>
-    <div class="step"><span class="n">3</span><h2>내 양식 넣기</h2><span class="hint">양식을 여러 개 넣으면 각각 채웁니다</span></div>
+    <div class="step"><span class="n">3</span><h2>그릇(내 양식) 넣기</h2><span class="hint">그릇을 여러 개 넣으면 각각 담습니다</span></div>
     <div class="drop" id="dropTpl">
       <b>채울 양식 파일을 여기에 끌어다 놓기</b>
-      <div class="hint" style="margin-bottom:8px">엑셀(xlsx)·한글(hwpx) — 머리글 줄 아래에 빈 줄이 있는 <b>목록 모양 표</b> (비상연락망·명단·대장)</div>
+      <div class="hint" style="margin-bottom:8px">엑셀(xlsx)·한글(hwpx) — 머리글 줄 아래에 빈 줄이 있는 <b>목록 모양 표</b> (명단·대장·현황표). 칸에 맞는 바구니를 알아서 고릅니다</div>
       <label class="btn"><input type="file" id="fileTpl" multiple hidden>양식 고르기</label>
-      <button type="button" class="btn" id="sampleTplX">예시 양식(엑셀)</button>
-      <button type="button" class="btn" id="sampleTplH">예시 양식(한글)</button>
+      <button type="button" class="btn" id="sampleTplX">예시: 비상연락망(엑셀)</button>
+      <button type="button" class="btn" id="sampleTplH">예시: 비상연락망(한글)</button>
+      <button type="button" class="btn" id="sampleTplG">예시: 물품 현황표(엑셀)</button>
     </div>
     <div id="tplList"></div>
   </section>
@@ -111,10 +114,11 @@ textarea{width:100%}
   <section class="panel">
     <h2>알아 두기 (시제품)</h2>
     <ul class="hint" style="margin:0;padding-left:18px">
-      <li>사람을 맞추는 기준은 <b>이름</b>입니다(생년월일이 있으면 함께 봅니다). 같은 이름이 둘이면 표시해 확인받습니다.</li>
+      <li><b>분리수거 규칙</b> — 칸 구성이 거의 같은 자료는 <b>아래로 쌓고</b>, 이름·관리번호처럼 값이 겹치는 칸을 함께 가진 자료는 그 칸을 기준으로 <b>옆으로 맞추고</b>, 서로 관계없는 자료는 <b>바구니를 따로</b> 둡니다. 자동으로 정한 것은 바구니에서 바꿀 수 있습니다.</li>
+      <li>머리글은 사전에 있는 낱말이면 같은 뜻끼리 묶고(성명=이름, 휴대폰=연락처), 처음 보는 머리글은 그대로 항목이 됩니다.</li>
       <li>읽기 어려운 자료는 억지로 읽지 않고, <b>먼저 바꿔 올 도구</b>를 알려 드립니다(옛 hwp → hwpx, 합친 칸이 많은 엑셀 → 표 청소기).</li>
-      <li>양식은 <b>원래 파일을 그대로 열어 칸만 채웁니다</b> — 글꼴·테두리·제목이 그대로 남습니다. 빈 줄이 모자라면 마지막 빈 줄을 본떠 늘립니다.</li>
-      <li>아직 안 되는 것: 사람마다 한 장씩 뽑는 양식, PDF·사진 속 표, 「이 변신 저장」.</li>
+      <li>그릇은 <b>원래 파일을 그대로 열어 칸만 채웁니다</b> — 글꼴·테두리·제목이 그대로 남습니다. 빈 줄이 모자라면 마지막 빈 줄을 본떠 늘립니다.</li>
+      <li>아직 안 되는 것: 한 건마다 한 장씩 뽑는 양식, PDF·사진 속 표, 거래 내역에 거래처 정보 붙이기 같은 「여러 줄 ↔ 한 줄」 맞추기, 「이 변신 저장」.</li>
     </ul>
   </section>
   <footer><div class="hint">문서 변신 마법사 시제품 · 만든 사람 김태균 · 공개 전 시험용</div></footer>
@@ -125,6 +129,6 @@ textarea{width:100%}
 <script src="lib/hwpx.js?v=1"></script>
 <script src="lib/xlsxw.js?v=1"></script>
 <script src="lib/xlkit.js?v=1"></script>
-<script src="app.js?v=1"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>
